@@ -38,3 +38,22 @@
 - name: stop alertmanager
   service: name=alertmanager state=stopped
   when: prometheus_use_service|bool
+
+
+- name: Start grafana
+  systemd:
+    name: grafana-server
+    state: started
+- name: Enable grafana
+  systemd:
+    name: grafana-server
+    enabled: yes    
+
+- name: Start prometheus
+  systemd:
+    name: prometheus
+    state: started
+- name: Enable prometheus
+  systemd:
+    name: prometheus
+    enabled: yes    

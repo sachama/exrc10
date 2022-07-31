@@ -1,3 +1,4 @@
+---
 - hosts: all
   become: True
   gather_facts: False
@@ -15,10 +16,10 @@
 
   vars:
 
-    #prometheus_components: [ "prometheus" ]
+    prometheus_components: [ "prometheus" ]
     #prometheus_components: [ "node_exporter" ]
     #prometheus_components: [ "alertmanager" ]
-    prometheus_components: [ "prometheus", "node_exporter", "alertmanager" ]
+    # prometheus_components: [ "prometheus", "node_exporter", "alertmanager" ]
     #prometheus_version: git
     #prometheus_node_exporter_version: git
     #prometheus_alertmanager_version: git
@@ -37,3 +38,63 @@
   post_tasks:
     - name: copy file_sd
       copy: src="{{ playbook_dir }}/test/file_sd.yml"  dest={{ prometheus_file_sd_config_path }}
+    - name: Install netstat
+      yum: name=net-tools state=present
+    - name: installing flask
+      pip: name=flask state=latest  
+    - name: installing flask_cors
+      pip: name=flask_cors state=latest
+    - name: installing prometheus_flask_exporter
+      pip: name=prometheus_flask_exporter state=latest
+    - name: installing flask_prometheus_metrics
+      pip: name=flask_prometheus_metrics state=latest
+    - name: run flask app
+      shell: |
+        nohup python3 /vagrant/webapp.py > log.txt 2>&1 &
+    - name: Install nginx
+      yum: name=nginx state=present
+    - name: Create webapp nginx config file
+      copy:
+          dest: /etc/nginx/conf.d/webapp.conf
+          mode: 0755
+          content: |
+            server {
+              listen 80;
+              listen [::]:80;
+              server_name localhost;
+            
+              location /app/ {
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $remote_addr;
+                  proxy_pass http://localhost:6000/app;
+              }
+            
+              location /health/ {
+                  proxy_set_header Host $host;
+                  proxy_set_header X-Forwarded-For $remote_addr;
+                  proxy_pass http://localhost:5000/metrics;
+              }
+            
+              location / {
+                  proxy_pass http://localhost:3000/;
+              }
+            
+            }    
+    - name: restart nginx
+      service: name=nginx state=restarted            
+
+
+
+    # grafana
+    - name: Install Grafana
+      yum: name=grafana state=present update_cache=yes
+      notify:
+        - Start grafana
+        - Enable grafana
+
+    # prometheus
+    - name: Start prometheus
+      yum: name=grafana state=present update_cache=yes
+      notify:
+        - Start prometheus
+        - Enable prometheus
